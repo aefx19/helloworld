@@ -1,0 +1,121 @@
+/// <summary>
+/// API for budget check integration.
+/// </summary>
+class RAFIMFIBudgetCheckIntegrationAPI
+{
+    /// <summary>
+    /// Checks if the budget is available for the given contract.
+    /// </summary>
+    /// <param name="_contract">The budget check contract.</param>
+    /// <returns>The result contract indicating if budget is available.</returns>
+    public RAFIMFIBudgetCheckIntegrationContractReturn BudgetCheck(
+        RAFIMFIBudgetCheckIntegrationContract _contract)
+    {
+        RAFIMFIBudgetCheckIntegrationContractReturn contractReturn =
+            new RAFIMFIBudgetCheckIntegrationContractReturn();
+
+        if (!_contract)
+        {
+            throw error("Budget check contract is required.");
+        }
+
+        str budgetCycleName = strLRTrim(_contract.parmBudgetCycleName());
+        if (!budgetCycleName)
+        {
+            throw error("Budget cycle name is required.");
+        }
+
+        str ledgerAccount = strLRTrim(_contract.parmLedgerAccount());
+        if (!ledgerAccount)
+        {
+            throw error("Ledger account is required.");
+        }
+
+        BudgetCycle cycle;
+        select firstOnly cycle
+            where cycle.Name == budgetCycleName;
+        if (!cycle)
+        {
+            throw error(strFmt(
+                "@RAFIMFIBudgetCheckIntegration:BudgetCycleNotFound",
+                budgetCycleName));
+        }
+
+        BudgetControlConfiguration budgetControlConfig;
+        select firstOnly budgetControlConfig;
+        if (!budgetControlConfig)
+        {
+            throw error("@RAFIMFIBudgetCheckIntegration:BudgetControlConfigNotFound");
+        }
+
+        DimensionAttributeValueCombination ledgerDim;
+        select firstOnly ledgerDim
+            where ledgerDim.DisplayValue == ledgerAccount;
+        if (!ledgerDim.RecId)
+        {
+            throw error("@RAFIMFIBudgetCheckIntegration:LedgerAccountNotFound");
+        }
+
+        boolean isAvailable = RAFIMFIBudgetCheckIntegrationAPI::resolveBudgetAvailability(
+            budgetControlConfig.RecId,
+            ledgerDim.RecId,
+            _contract.parmAmount(),
+            cycle.RecId);
+
+        contractReturn.parmIsBudgetAvailable(isAvailable);
+        return contractReturn;
+    }
+
+    private static boolean resolveBudgetAvailability(
+        RecId _budgetControlConfigRecId,
+        RecId _ledgerDimensionRecId,
+        Amount _amount,
+        RecId _budgetCycleRecId)
+    {
+        DictMethod dictMethod;
+
+        dictMethod = RAFIMFIBudgetCheckIntegrationAPI::findBudgetAvailabilityMethod(
+            "BudgetControlCheckFacade");
+        if (dictMethod)
+        {
+            return dictMethod.call(
+                null,
+                _budgetControlConfigRecId,
+                _ledgerDimensionRecId,
+                _amount,
+                _budgetCycleRecId);
+        }
+
+        dictMethod = RAFIMFIBudgetCheckIntegrationAPI::findBudgetAvailabilityMethod(
+            "BudgetCheckFacade");
+        if (dictMethod)
+        {
+            return dictMethod.call(
+                null,
+                _budgetControlConfigRecId,
+                _ledgerDimensionRecId,
+                _amount,
+                _budgetCycleRecId);
+        }
+
+        throw error("No supported budget check facade was found.");
+    }
+
+    private static DictMethod findBudgetAvailabilityMethod(str _className)
+    {
+        ClassId classId = classIdGet(_className);
+        if (!classId)
+        {
+            return null;
+        }
+
+        DictClass dictClass = new DictClass(classId);
+        if (!dictClass)
+        {
+            return null;
+        }
+
+        return dictClass.staticMethodObject("isBudgetAvailable");
+    }
+
+}
