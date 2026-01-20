@@ -1,0 +1,68 @@
+/// <summary>
+/// API for budget check integration.
+/// </summary>
+class RAFIMFIBudgetCheckIntegrationAPI
+{
+    /// <summary>
+    /// Checks if the budget is available for the given contract.
+    /// </summary>
+    /// <param name="_contract">The budget check contract.</param>
+    /// <returns>The result contract indicating if budget is available.</returns>
+    public RAFIMFIBudgetCheckIntegrationContractReturn BudgetCheck(
+        RAFIMFIBudgetCheckIntegrationContract _contract)
+    {
+        RAFIMFIBudgetCheckIntegrationContractReturn contractReturn =
+            new RAFIMFIBudgetCheckIntegrationContractReturn();
+
+        if (!_contract)
+        {
+            throw error("Budget check contract is required.");
+        }
+
+        str budgetCycleName = strLTrim(strRTrim(_contract.parmBudgetCycleName()));
+        if (!budgetCycleName)
+        {
+            throw error("Budget cycle name is required.");
+        }
+
+        str ledgerAccount = strLTrim(strRTrim(_contract.parmLedgerAccount()));
+        if (!ledgerAccount)
+        {
+            throw error("Ledger account is required.");
+        }
+
+        BudgetCycle cycle;
+        select firstOnly cycle
+            where cycle.Name == budgetCycleName;
+        if (!cycle)
+        {
+            throw error(strFmt(
+                "@RAFIMFIBudgetCheckIntegration:BudgetCycleNotFound",
+                budgetCycleName));
+        }
+
+        BudgetControlConfiguration budgetControlConfig;
+        select firstOnly budgetControlConfig;
+        if (!budgetControlConfig)
+        {
+            throw error("@RAFIMFIBudgetCheckIntegration:BudgetControlConfigNotFound");
+        }
+
+        DimensionAttributeValueCombination ledgerDim =
+            DimensionAttributeValueCombination::findByDisplayValue(ledgerAccount);
+        if (!ledgerDim)
+        {
+            throw error("@RAFIMFIBudgetCheckIntegration:LedgerAccountNotFound");
+        }
+
+        boolean isAvailable = BudgetControlCheckFacade::isBudgetAvailable(
+            budgetControlConfig.RecId,
+            ledgerDim.RecId,
+            _contract.parmAmount(),
+            cycle.RecId);
+
+        contractReturn.parmIsBudgetAvailable(isAvailable);
+        return contractReturn;
+    }
+
+}
