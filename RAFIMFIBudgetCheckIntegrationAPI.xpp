@@ -19,13 +19,13 @@ class RAFIMFIBudgetCheckIntegrationAPI
             throw error("Budget check contract is required.");
         }
 
-        str budgetCycleName = strLTrim(strRTrim(_contract.parmBudgetCycleName()));
+        str budgetCycleName = strLRTrim(_contract.parmBudgetCycleName());
         if (!budgetCycleName)
         {
             throw error("Budget cycle name is required.");
         }
 
-        str ledgerAccount = strLTrim(strRTrim(_contract.parmLedgerAccount()));
+        str ledgerAccount = strLRTrim(_contract.parmLedgerAccount());
         if (!ledgerAccount)
         {
             throw error("Ledger account is required.");
@@ -48,9 +48,10 @@ class RAFIMFIBudgetCheckIntegrationAPI
             throw error("@RAFIMFIBudgetCheckIntegration:BudgetControlConfigNotFound");
         }
 
-        DimensionAttributeValueCombination ledgerDim =
-            DimensionAttributeValueCombination::findByDisplayValue(ledgerAccount);
-        if (!ledgerDim)
+        DimensionAttributeValueCombination ledgerDim;
+        select firstOnly ledgerDim
+            where ledgerDim.DisplayValue == ledgerAccount;
+        if (!ledgerDim.RecId)
         {
             throw error("@RAFIMFIBudgetCheckIntegration:LedgerAccountNotFound");
         }
