@@ -56,7 +56,7 @@ class RAFIMFIBudgetCheckIntegrationAPI
             throw error("@RAFIMFIBudgetCheckIntegration:LedgerAccountNotFound");
         }
 
-        boolean isAvailable = BudgetControlCheckFacade::isBudgetAvailable(
+        boolean isAvailable = RAFIMFIBudgetCheckIntegrationAPI::resolveBudgetAvailability(
             budgetControlConfig.RecId,
             ledgerDim.RecId,
             _contract.parmAmount(),
@@ -64,6 +64,58 @@ class RAFIMFIBudgetCheckIntegrationAPI
 
         contractReturn.parmIsBudgetAvailable(isAvailable);
         return contractReturn;
+    }
+
+    private static boolean resolveBudgetAvailability(
+        RecId _budgetControlConfigRecId,
+        RecId _ledgerDimensionRecId,
+        Amount _amount,
+        RecId _budgetCycleRecId)
+    {
+        DictMethod dictMethod;
+
+        dictMethod = RAFIMFIBudgetCheckIntegrationAPI::findBudgetAvailabilityMethod(
+            "BudgetControlCheckFacade");
+        if (dictMethod)
+        {
+            return dictMethod.call(
+                null,
+                _budgetControlConfigRecId,
+                _ledgerDimensionRecId,
+                _amount,
+                _budgetCycleRecId);
+        }
+
+        dictMethod = RAFIMFIBudgetCheckIntegrationAPI::findBudgetAvailabilityMethod(
+            "BudgetCheckFacade");
+        if (dictMethod)
+        {
+            return dictMethod.call(
+                null,
+                _budgetControlConfigRecId,
+                _ledgerDimensionRecId,
+                _amount,
+                _budgetCycleRecId);
+        }
+
+        throw error("No supported budget check facade was found.");
+    }
+
+    private static DictMethod findBudgetAvailabilityMethod(str _className)
+    {
+        ClassId classId = classIdGet(_className);
+        if (!classId)
+        {
+            return null;
+        }
+
+        DictClass dictClass = new DictClass(classId);
+        if (!dictClass)
+        {
+            return null;
+        }
+
+        return dictClass.staticMethodObject("isBudgetAvailable");
     }
 
 }
